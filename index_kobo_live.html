@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoreo Encuesta Agrícola COMRURAL (en vivo)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    color-scheme: light;
+    --surface-1:      #fcfcfb; --page-plane: #f9f9f7;
+    --text-primary:   #0b0b0b; --text-secondary: #52514e; --text-muted:#898781;
+    --grid:           #e1e0d9; --baseline:#c3c2b7; --border: rgba(11,11,11,0.10);
+    --good:           #0ca30c; --warning-ink:#946200; --critical:#d03b3b;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19; --page-plane: #0d0d0d;
+      --text-primary:   #ffffff; --text-secondary: #c3c2b7; --text-muted:#898781;
+      --grid:           #2c2c2a; --baseline:#383835; --border: rgba(255,255,255,0.10);
+      --warning-ink:    #fab219; --critical:#e66767;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19; --page-plane: #0d0d0d;
+    --text-primary:   #ffffff; --text-secondary: #c3c2b7; --text-muted:#898781;
+    --grid:           #2c2c2a; --baseline:#383835; --border: rgba(255,255,255,0.10);
+    --warning-ink:    #fab219; --critical:#e66767;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif; background: var(--page-plane); color: var(--text-primary); padding: 16px; }
+  .wrap{max-width:1260px; margin:0 auto;}
+  h1{font-size:1.35rem; margin:0 0 2px 0;}
+  h3{font-size:0.95rem; margin:20px 0 10px 0;}
+  .subtitle{color:var(--text-secondary); font-size:0.9rem; margin:0 0 16px 0;}
+  .card{ background: var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .field{display:flex; flex-direction:column; gap:4px; flex:1 1 160px;}
+  .field label{font-size:0.78rem; color:var(--text-secondary);}
+  .field input, .field select{ padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--page-plane); color:var(--text-primary); font-size:0.9rem; }
+  .config-row{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-top:12px;}
+  button{ padding:9px 16px; border-radius:8px; border:none; background:var(--s1); color:#fff; font-size:0.9rem; cursor:pointer; font-weight:600; }
+  button.secondary{ background:var(--surface-1); color:var(--text-primary); border:1px solid var(--border); }
+  button.mini{ padding:5px 10px; font-size:0.76rem; font-weight:600; background:var(--surface-1); color:var(--text-secondary); border:1px solid var(--border); }
+  button:hover{filter:brightness(1.08);}
+  .status-line{font-size:0.8rem; color:var(--text-muted); margin-top:10px;}
+  .status-line.err{color:var(--critical);}
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;}
+  .kpi{background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:14px;}
+  .kpi .value{font-size:1.7rem; font-weight:700; font-variant-numeric: tabular-nums;}
+  .kpi .label{font-size:0.78rem; color:var(--text-secondary); margin-top:2px;}
+  .kpi .value.critical{color:var(--critical);}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  @media (max-width:820px){ .grid-2,.grid-3{grid-template-columns:1fr;} }
+  .card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px;}
+  .chart-title{font-size:0.92rem; font-weight:600; margin:0 0 10px 0;}
+  .card-head .chart-title{margin:0;}
+  .chart-sub{font-size:0.76rem; color:var(--text-muted); margin:-8px 0 10px 0;}
+  .card-head .chart-sub{margin:2px 0 0 0;}
+  svg text{fill:var(--text-secondary); font-size:11px; font-family:inherit;}
+  .axis-line{stroke:var(--baseline); stroke-width:1;}
+  .grid-line{stroke:var(--grid); stroke-width:1;}
+  .tooltip{ position:fixed; pointer-events:none; background:var(--text-primary); color:var(--surface-1); padding:6px 9px; border-radius:6px; font-size:0.78rem; opacity:0; transition:opacity .1s; z-index:50; white-space:nowrap; }
+  #map{height:380px; border-radius:10px; width:100%;}
+  .legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:0.78rem; color:var(--text-secondary);}
+  .legend-item{display:flex; align-items:center; gap:6px;}
+  .legend-dot{width:10px; height:10px; border-radius:3px; flex:none;}
+  table{width:100%; border-collapse:collapse; font-size:0.82rem;}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:top;}
+  th{color:var(--text-secondary); font-weight:600; font-size:0.76rem; text-transform:uppercase; letter-spacing:.02em;}
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:600; margin:1px 3px 1px 0;}
+  .badge.critical{background:rgba(208,59,59,0.14); color:var(--critical);}
+  .badge.warning{background:rgba(250,178,25,0.18); color:var(--warning-ink);}
+  .badge.good{background:rgba(12,163,12,0.14); color:var(--good);}
+  .badge.info{background:rgba(42,120,214,0.14); color:var(--s1);}
+  .empty{color:var(--text-muted); font-size:0.85rem; padding:20px; text-align:center;}
+  .table-scroll{max-height:440px; overflow:auto;}
+  .table-scroll.wide{overflow-x:auto;}
+  .footnote{font-size:0.76rem; color:var(--text-muted); line-height:1.55;}
+  .stat-row{display:flex; flex-wrap:wrap; gap:10px;}
+  .stat-pill{flex:1 1 140px; background:var(--page-plane); border:1px solid var(--border); border-radius:10px; padding:10px 12px;}
+  .stat-pill .v{font-size:1.2rem; font-weight:700; font-variant-numeric: tabular-nums;}
+  .stat-pill .l{font-size:0.74rem; color:var(--text-secondary);}
+  .tabs{display:flex; gap:4px; margin:18px 0 16px 0; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+  .tab-btn{ padding:9px 14px; border:none; background:none; color:var(--text-secondary); font-size:0.88rem; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; border-radius:0; }
+  .tab-btn.active{ color:var(--s1); border-bottom-color:var(--s1); }
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .catalog-item{padding:8px 0; border-bottom:1px solid var(--border); font-size:0.83rem;}
+  .catalog-item:last-child{border-bottom:none;}
+  .catalog-item .cnt{font-weight:700; font-variant-numeric:tabular-nums;}
+  .ficha-table td:first-child{ color:var(--text-secondary); width:38%; font-size:0.8rem; }
+  .ficha-table td:last-child{ font-weight:600; }
+  .ficha-section{margin-top:16px; font-weight:700; font-size:0.85rem; color:var(--s1);}
+  code{ background:var(--page-plane); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:0.82em; }
+  pre{ background:var(--page-plane); border:1px solid var(--border); border-radius:8px; padding:10px; overflow:auto; font-size:0.76rem; max-height:320px; }
+  .filter-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .filter-bar .field{flex:1 1 150px;}
+  .filter-note{font-size:0.78rem; color:var(--text-secondary); margin-top:10px;}
+  td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .render-error{ font-size:0.82rem; color:var(--critical); background:rgba(208,59,59,0.08); border:1px solid rgba(208,59,59,0.3); border-radius:8px; padding:10px; margin-bottom:12px; }
+  @media print{
+    body *{ visibility:hidden; }
+    #fichaPrintArea, #fichaPrintArea *{ visibility:visible; }
+    #fichaPrintArea{ position:absolute; left:0; top:0; width:100%; }
+    .no-print{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Monitoreo — Encuesta Agrícola Post Cierre COMRURAL</h1>
+  <p class="subtitle">Datos en vivo desde KoboToolbox</p>
+
+  <div class="card no-print">
+    <div class="config-row" style="margin-top:0;">
+      <div class="field" style="flex:1 1 150px;">
+        <label for="autoRefresh">Actualización automática</label>
+        <select id="autoRefresh">
+          <option value="0">Desactivada</option>
+          <option value="5">Cada 5 minutos</option>
+          <option value="10">Cada 10 minutos</option>
+          <option value="15">Cada 15 minutos</option>
+          <option value="30">Cada 30 minutos</option>
+        </select>
+      </div>
+      <button id="loadBtn">Actualizar desde Kobo</button>
+    </div>
+    <div class="status-line" id="statusLine">Cargando datos de Kobo…</div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+
+    <div class="card no-print">
+      <p class="chart-title">Filtros (se aplican a todas las pestañas)</p>
+      <div class="filter-bar">
+        <div class="field" style="flex:1 1 130px;"><label for="fDesde">Fecha desde</label><input id="fDesde" type="date"></div>
+        <div class="field" style="flex:1 1 130px;"><label for="fHasta">Fecha hasta</label><input id="fHasta" type="date"></div>
+        <div class="field"><label for="fCadena">Cadena de valor</label><select id="fCadena"></select></div>
+        <div class="field"><label for="fVentana">Ventana</label><select id="fVentana"></select></div>
+        <div class="field"><label for="fEncuestador">Encuestador</label><select id="fEncuestador"></select></div>
+        <button id="clearFilters" class="secondary">Limpiar</button>
+      </div>
+      <div class="filter-note" id="filterNote"></div>
+    </div>
+
+    <div class="tabs no-print">
+      <button class="tab-btn active" data-tab="avance">Avance de campo</button>
+      <button class="tab-btn" data-tab="cadena">Indicadores por cadena</button>
+      <button class="tab-btn" data-tab="alarmas">Calidad y alarmas</button>
+      <button class="tab-btn" data-tab="ficha">Visualizador individual</button>
+      <button class="tab-btn" data-tab="diagnostico">Diagnóstico</button>
+    </div>
+
+    <!-- TAB 1: AVANCE -->
+    <div class="tab-panel active" id="tab-avance">
+      <div id="err-avance"></div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="grid-2" style="margin-top:16px;">
+        <div class="card">
+          <p class="chart-title">Avance por día</p>
+          <div id="chartDia"></div>
+        </div>
+        <div class="card">
+          <p class="chart-title">Entrevistas por encuestador</p>
+          <div id="chartEncuestador"></div>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card"><p class="chart-title">Por cadena de valor</p><div id="chartCadena"></div></div>
+        <div class="card"><p class="chart-title">Por ventana</p><div id="chartVentana"></div></div>
+        <div class="card"><p class="chart-title">Por versión de formulario</p><div id="chartVersion"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="chart-title">Entrevistas recibidas: cadena × ventana</p>
+            <p class="chart-sub">Conteo de lo que ya está en Kobo, según los filtros activos.</p>
+          </div>
+          <button class="mini no-print" data-export="cobertura">Exportar CSV</button>
+        </div>
+        <div class="table-scroll wide"><table id="tablaCobertura"></table></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CADENA -->
+    <div class="tab-panel" id="tab-cadena">
+      <div id="err-cadena"></div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="chart-title">Indicadores agregados por cadena de valor</p>
+            <p class="chart-sub" id="cadenaSub"></p>
+          </div>
+          <button class="mini no-print" data-export="cadena">Exportar CSV</button>
+        </div>
+        <div class="table-scroll wide"><table id="tablaCadena"></table></div>
+      </div>
+      <div class="card">
+        <p class="chart-title">Mapa de entrevistas</p>
+        <div id="map"></div>
+        <div class="legend" id="mapLegend"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ALARMAS -->
+    <div class="tab-panel" id="tab-alarmas">
+      <div id="err-alarmas"></div>
+      <div class="kpi-grid" id="alarmKpiGrid"></div>
+      <div class="grid-2" style="margin-top:16px;">
+        <div class="card">
+          <div class="card-head">
+            <p class="chart-title">Catálogo de alarmas</p>
+            <button class="mini no-print" data-export="catalogo">Exportar CSV</button>
+          </div>
+          <div id="alarmCatalog"></div>
+        </div>
+        <div class="card">
+          <p class="chart-title">Entrevistas con más alarmas</p>
+          <div id="chartAlarmasTop"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <p class="chart-title">Detalle de alarmas por entrevista</p>
+          <button class="mini no-print" data-export="alarmas">Exportar CSV</button>
+        </div>
+        <div class="table-scroll">
+          <table id="qualityTable"><thead><tr><th>Entrevista</th><th>Productor</th><th>Cadena</th><th>Encuestador</th><th>Fecha</th><th>Alertas</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: FICHA -->
+    <div class="tab-panel" id="tab-ficha">
+      <div id="err-ficha"></div>
+      <div class="card no-print">
+        <div class="config-row" style="margin-top:0;">
+          <div class="field" style="flex:2 1 320px;">
+            <label for="fichaSelect">Selecciona una entrevista</label>
+            <select id="fichaSelect"></select>
+          </div>
+          <button id="printFicha" class="secondary">Descargar / imprimir ficha (PDF)</button>
+          <button class="mini" data-export="ficha">Exportar ficha CSV</button>
+        </div>
+      </div>
+      <div class="card" id="fichaPrintArea">
+        <div id="fichaAlarmas"></div>
+        <table class="ficha-table" id="fichaTable"></table>
+      </div>
+    </div>
+
+    <!-- TAB 5: DIAGNOSTICO -->
+    <div class="tab-panel" id="tab-diagnostico">
+      <div id="err-diagnostico"></div>
+      <div class="card">
+        <p class="chart-title">Qué encontró el dashboard en tu API de Kobo</p>
+        <p class="chart-sub">Úsalo para confirmar que los campos se mapearon bien, o para mandarme la info si algo no cuadra.</p>
+        <div id="diagContent"></div>
+      </div>
+    </div>
+
+    <p class="footnote no-print">
+      Notas: los campos se detectan de forma flexible (por nombre exacto conocido, o por coincidencia de patrón) porque los
+      nombres de variable de tu formulario en la API pueden diferir ligeramente de los que vimos en el Excel exportado.
+      Revisa la pestaña "Diagnóstico" si algún indicador se ve vacío o raro. Los CSV se exportan con punto y coma
+      como separador, para que Excel en español los abra en columnas directamente.
+    </p>
+  </div>
+
+  <div class="empty" id="emptyState" style="display:none;">Sin datos cargados todavía.</div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ============ CONFIGURACIÓN ============
+// Los datos NO se piden directo a Kobo: la API de Kobo no permite llamadas
+// cruzadas desde el navegador (CORS). Se piden a kobo_proxy.php, que corre en
+// tu propio hosting, habla con Kobo del lado del servidor y guarda el token.
+//
+// Por defecto se busca kobo_proxy.php en la MISMA carpeta que este archivo.
+// Si lo pusiste en otra ruta, cámbialo aquí (ej. '/api/kobo_proxy.php').
+const PROXY_URL = 'kobo_proxy.php';
+// =======================================
+
+const css = getComputedStyle(document.documentElement);
+function cvar(name){ return css.getPropertyValue(name).trim(); }
+const PALETTE = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+function seriesColor(i){ return cvar(PALETTE[i % PALETTE.length]); }
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(html, x, y){ tooltip.innerHTML = html; tooltip.style.left=(x+14)+'px'; tooltip.style.top=(y+14)+'px'; tooltip.style.opacity=1; }
+function hideTooltip(){ tooltip.style.opacity = 0; }
+
+// ---------- helpers ----------
+function num(v){ if(v===undefined||v===null||v==='') return NaN; const n=parseFloat(String(v).trim().replace(/,/g,'')); return isNaN(n)?NaN:n; }
+function trim(v){ return (v===undefined||v===null) ? '' : String(v).trim(); }
+function upper(v){ return trim(v).toUpperCase(); }
+function isSi(v){ const u=upper(v); return u==='SÍ'||u==='SI'||u==='YES'||u==='1'||u==='TRUE'; }
+function isNo(v){ const u=upper(v); return u==='NO'||u==='0'||u==='FALSE'; }
+function toDateLabel(v){
+  if(v===undefined||v===null||v==='') return '';
+  if(v instanceof Date) return v.toISOString().slice(0,10);
+  const s = trim(v);
+  const d = new Date(s);
+  if(!isNaN(d.getTime()) && /\d{4}/.test(s)) return d.toISOString().slice(0,10);
+  return s;
+}
+function avg(arr){ const a=arr.filter(n=>!isNaN(n)); return a.length? a.reduce((x,y)=>x+y,0)/a.length : NaN; }
+function fmt(n, dec=1){ return isNaN(n)?'—':n.toFixed(dec).replace(/\.0$/,''); }
+function pct(part,total){ return total? Math.round(part/total*100) : null; }
+function groupCount(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r); if(!k) return; m.set(k,(m.get(k)||0)+1); }); return m; }
+function sortedEntries(m, desc=true){ return [...m.entries()].sort((a,b)=> desc? b[1]-a[1] : a[1]-b[1]); }
+function esc(s){ return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---------- exportación CSV ----------
+// Separador ";" porque Excel en español usa punto y coma como separador de lista.
+function toCSV(rows){
+  return rows.map(r=>r.map(c=>{
+    const s = (c===undefined||c===null)? '' : String(c);
+    return /[";\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(';')).join('\r\n');
+}
+function downloadCSV(filename, rows){
+  const blob = new Blob(['﻿'+toCSV(rows)], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+const EXPORTS = {}; // nombre -> array de filas listo para CSV
+function stamp(){ return new Date().toISOString().slice(0,10); }
+document.querySelectorAll('[data-export]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const key = btn.dataset.export;
+    const data = EXPORTS[key];
+    if(!data || !data.length){ alert('Todavía no hay datos para exportar en esta tabla.'); return; }
+    downloadCSV(`comrural_${key}_${stamp()}.csv`, data);
+  });
+});
+
+// ---------- fuzzy field picker ----------
+// patterns: array where each item is either an exact string key, or a RegExp tested against every key.
+function pick(obj, patterns){
+  if(!obj) return undefined;
+  for(const p of patterns){
+    if(typeof p === 'string'){ if(Object.prototype.hasOwnProperty.call(obj,p)) return obj[p]; }
+  }
+  for(const p of patterns){
+    if(p instanceof RegExp){ for(const k in obj){ if(p.test(k)) return obj[k]; } }
+  }
+  return undefined;
+}
+function pickKey(obj, patterns){
+  if(!obj) return undefined;
+  for(const p of patterns){ if(typeof p==='string' && Object.prototype.hasOwnProperty.call(obj,p)) return p; }
+  for(const p of patterns){ if(p instanceof RegExp){ for(const k in obj){ if(p.test(k)) return k; } } }
+  return undefined;
+}
+
+// ---------- SVG bar chart ----------
+function barChart(container, {labels, values, horizontal=false, color, height=260, valueSuffix=''}){
+  container.innerHTML = '';
+  if(!labels.length){ container.innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  const width = container.clientWidth || 480;
+  const max = Math.max(...values, 1);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width','100%'); svg.setAttribute('height',height);
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  svg.style.overflow='visible';
+  if(horizontal){
+    const leftPad=150, rightPad=46, topPad=6, bottomPad=6;
+    const rowH = Math.min(28, (height-topPad-bottomPad)/labels.length);
+    const plotW = width-leftPad-rightPad;
+    labels.forEach((lab,i)=>{
+      const y = topPad+i*rowH;
+      const barW = Math.max(2,(values[i]/max)*plotW);
+      const t=document.createElementNS(svg.namespaceURI,'text');
+      t.setAttribute('x',leftPad-8); t.setAttribute('y',y+rowH*0.62); t.setAttribute('text-anchor','end');
+      t.textContent = lab.length>22? lab.slice(0,21)+'…' : lab;
+      svg.appendChild(t);
+      const rect=document.createElementNS(svg.namespaceURI,'rect');
+      rect.setAttribute('x',leftPad); rect.setAttribute('y',y+rowH*0.18);
+      rect.setAttribute('width',barW); rect.setAttribute('height',rowH*0.64);
+      rect.setAttribute('rx',4); rect.setAttribute('fill',color);
+      rect.style.cursor='pointer';
+      rect.addEventListener('mousemove', e=>showTooltip(`<b>${esc(lab)}</b>: ${values[i]}${valueSuffix}`, e.clientX, e.clientY));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const vt=document.createElementNS(svg.namespaceURI,'text');
+      vt.setAttribute('x',leftPad+barW+6); vt.setAttribute('y',y+rowH*0.62);
+      vt.textContent = values[i]+valueSuffix; vt.setAttribute('fill', cvar('--text-primary'));
+      svg.appendChild(vt);
+    });
+  } else {
+    const leftPad=34, rightPad=10, topPad=10, bottomPad=40;
+    const plotH=height-topPad-bottomPad, plotW=width-leftPad-rightPad;
+    const bw=plotW/labels.length;
+    [0,0.25,0.5,0.75,1].forEach(f=>{
+      const y=topPad+plotH*(1-f);
+      const gl=document.createElementNS(svg.namespaceURI,'line');
+      gl.setAttribute('x1',leftPad); gl.setAttribute('x2',width-rightPad); gl.setAttribute('y1',y); gl.setAttribute('y2',y);
+      gl.setAttribute('class','grid-line'); svg.appendChild(gl);
+    });
+    labels.forEach((lab,i)=>{
+      const barH=(values[i]/max)*plotH;
+      const x=leftPad+i*bw+bw*0.15, w=bw*0.7;
+      const rect=document.createElementNS(svg.namespaceURI,'rect');
+      rect.setAttribute('x',x); rect.setAttribute('y',topPad+plotH-barH);
+      rect.setAttribute('width',w); rect.setAttribute('height',Math.max(1,barH));
+      rect.setAttribute('rx',4); rect.setAttribute('fill',color); rect.style.cursor='pointer';
+      rect.addEventListener('mousemove', e=>showTooltip(`<b>${esc(lab)}</b>: ${values[i]}${valueSuffix}`, e.clientX, e.clientY));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const t=document.createElementNS(svg.namespaceURI,'text');
+      t.setAttribute('x',x+w/2); t.setAttribute('y',height-bottomPad+16); t.setAttribute('text-anchor','middle');
+      t.textContent = lab.length>12? lab.slice(0,11)+'…' : lab;
+      svg.appendChild(t);
+    });
+    const baseline=document.createElementNS(svg.namespaceURI,'line');
+    baseline.setAttribute('x1',leftPad); baseline.setAttribute('x2',width-rightPad);
+    baseline.setAttribute('y1',topPad+plotH); baseline.setAttribute('y2',topPad+plotH);
+    baseline.setAttribute('class','axis-line'); svg.appendChild(baseline);
+  }
+  container.appendChild(svg);
+}
+
+function lineChart(container, {labels, values, color, height=260}){
+  container.innerHTML = '';
+  if(!labels.length){ container.innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  const width = container.clientWidth || 480;
+  const leftPad=34, rightPad=14, topPad=12, bottomPad=34;
+  const plotW=width-leftPad-rightPad, plotH=height-topPad-bottomPad;
+  const max=Math.max(...values,1);
+  const stepX = labels.length>1? plotW/(labels.length-1) : 0;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width','100%'); svg.setAttribute('height',height);
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`); svg.style.overflow='visible';
+  [0,0.5,1].forEach(f=>{
+    const y=topPad+plotH*(1-f);
+    const gl=document.createElementNS(svg.namespaceURI,'line');
+    gl.setAttribute('x1',leftPad); gl.setAttribute('x2',width-rightPad); gl.setAttribute('y1',y); gl.setAttribute('y2',y);
+    gl.setAttribute('class','grid-line'); svg.appendChild(gl);
+    const t=document.createElementNS(svg.namespaceURI,'text'); t.setAttribute('x',4); t.setAttribute('y',y+4);
+    t.textContent = Math.round(max*f); svg.appendChild(t);
+  });
+  const pts = labels.map((lab,i)=>[leftPad+i*stepX, topPad+plotH-(values[i]/max)*plotH]);
+  const path=document.createElementNS(svg.namespaceURI,'path');
+  path.setAttribute('d','M'+pts.map(p=>p.join(',')).join(' L'));
+  path.setAttribute('fill','none'); path.setAttribute('stroke',color); path.setAttribute('stroke-width','2');
+  svg.appendChild(path);
+  pts.forEach(([x,y],i)=>{
+    const c=document.createElementNS(svg.namespaceURI,'circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',4); c.setAttribute('fill',color); c.style.cursor='pointer';
+    c.addEventListener('mousemove', e=>showTooltip(`<b>${esc(labels[i])}</b>: ${values[i]}`, e.clientX, e.clientY));
+    c.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(c);
+    if(labels.length<=20 || i%Math.ceil(labels.length/12)===0){
+      const t=document.createElementNS(svg.namespaceURI,'text');
+      t.setAttribute('x',x); t.setAttribute('y',height-bottomPad+16); t.setAttribute('text-anchor','middle');
+      t.textContent = labels[i].slice(5); svg.appendChild(t);
+    }
+  });
+  const baseline=document.createElementNS(svg.namespaceURI,'line');
+  baseline.setAttribute('x1',leftPad); baseline.setAttribute('x2',width-rightPad);
+  baseline.setAttribute('y1',topPad+plotH); baseline.setAttribute('y2',topPad+plotH);
+  baseline.setAttribute('class','axis-line'); svg.appendChild(baseline);
+  container.appendChild(svg);
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='cadena' && mapInstance){
+      setTimeout(()=>{ mapInstance.invalidateSize(); if(lastMarkersGroup) mapInstance.fitBounds(lastMarkersGroup.getBounds().pad(0.2)); }, 80);
+    }
+  });
+});
+
+// ---------- field getters on the MAIN record ----------
+function F_id(r){ return pick(r, ['_id']); }
+function F_entrevistaId(r){ return pick(r, ['entrevista_id', /entrevista.?id/i]); }
+function F_ventana(r){ return pick(r, ['m0/ventana', /ventana/i]); }
+function F_productor(r){ return pick(r, ['m0/productor', /productor$/i]); }
+function F_cadena(r){ return pick(r, ['m0/cadena_original_origen', /cadena.*origen/i, 'm0/cadena', /cadena/i]); }
+function F_fecha(r){ return pick(r, ['m0/fecha_visita', /fecha.*visita/i]); }
+function F_resultado(r){ return pick(r, ['m0/resultado', /resultado/i]); }
+function F_supervisor(r){ return pick(r, ['m0/supervisor', /supervisor$/i]); }
+function F_encuestador(r){ return pick(r, ['m0/encuestador', /encuestador$/i]); }
+function F_consentimiento(r){ return pick(r, ['m0/consentimiento', /consentimiento/i]); }
+function F_nombreFinal(r){ return pick(r, ['m0/validacion/nombre_final', /nombre_final/i]); }
+function F_edadPadron(r){ return pick(r, ['m0/validacion/edad_padron', /edad_padron/i]); }
+function F_edadFinal(r){ return pick(r, ['m0/validacion/edad_final', /edad_final/i]); }
+function F_sexoFinal(r){ return pick(r, ['m0/validacion/sexo_final', /sexo_final/i]); }
+function F_sexoEtiqueta(r){ return pick(r, ['m0/validacion/sexo_etiqueta', /sexo_etiqueta/i, /sexo/i]); }
+function F_municipio(r){ return pick(r, ['m0/ubicacion/municipio', /municipio$/i]); }
+function F_geo(r){
+  // Kobo siempre expone _geolocation:[lat,lon] además de los campos propios del formulario.
+  if(Array.isArray(r._geolocation) && r._geolocation.length===2 && r._geolocation[0]!=null) return {lat:num(r._geolocation[0]), lon:num(r._geolocation[1])};
+  const lat = num(pick(r, ['m0/ubicacion/latitud', /latitud/i]));
+  const lon = num(pick(r, ['m0/ubicacion/longitud', /longitud/i]));
+  return {lat, lon};
+}
+function F_hogarPersonas(r){ return pick(r, [/q100$/i, /personas.*hogar/i]); }
+function F_formaParteOPR(r){ return pick(r, [/113/, /forma parte.*plan/i, /plan.*negocios.*opr/i]); }
+function F_migro(r){ return pick(r, [/^m1\/?q?112$/i, /112.*migra/i, /algun.*miembro.*migrado/i]); }
+function F_asistenciaTecnica(r){ return pick(r, [/119.*asistencia/i, /asistencia.*tecnica/i]); }
+function F_nActuales(r){ return pick(r, ['m4/n_actuales', /n_actuales/i]); }
+function F_version(r){ return pick(r, ['__version__']); }
+function F_inicio(r){ const v = pick(r, ['start','inicio']); return v ? new Date(v) : null; }
+function F_fin(r){ const v = pick(r, ['end','fin']); return v ? new Date(v) : null; }
+
+function durationMin(r){ const a=F_inicio(r), b=F_fin(r); if(!a||!b||isNaN(a)||isNaN(b)) return null; return (b-a)/60000; }
+
+// ---------- repeat-group auto-detection ----------
+// A repeat group shows up as a top-level key whose value is an array of objects.
+function detectRepeatGroups(results){
+  const candidates = {}; // key -> count of records where it's a non-empty array of objects
+  results.slice(0, Math.min(30, results.length)).forEach(r=>{
+    for(const k in r){
+      const v = r[k];
+      if(Array.isArray(v) && v.length && typeof v[0]==='object' && v[0]!==null && !Array.isArray(v[0])){
+        candidates[k] = (candidates[k]||0) + 1;
+      }
+    }
+  });
+  const keys = Object.keys(candidates);
+  // classify each candidate key by inspecting a sample sub-object's own keys
+  const classified = {miembros:null, practicas:null, sostenibilidad:null, otros:[]};
+  keys.forEach(k=>{
+    let sample = null;
+    for(const r of results){ if(Array.isArray(r[k]) && r[k].length){ sample = r[k][0]; break; } }
+    if(!sample){ classified.otros.push(k); return; }
+    const subKeys = Object.keys(sample).join(' ').toLowerCase();
+    if(/sexo|q10[1-9]|edad.*miembro|linea/.test(subKeys) && !/s_cadena|a_cadena/.test(subKeys)){
+      if(!classified.miembros) classified.miembros = k; else classified.otros.push(k);
+    } else if(/a_cadena|a_entrevista|301|300\./.test(subKeys)){
+      if(!classified.practicas) classified.practicas = k; else classified.otros.push(k);
+    } else if(/s_cadena|s_entrevista|401|400\./.test(subKeys)){
+      if(!classified.sostenibilidad) classified.sostenibilidad = k; else classified.otros.push(k);
+    } else {
+      classified.otros.push(k);
+    }
+  });
+  return {classified, allKeys: keys};
+}
+
+function subPick(obj, patterns){ return pick(obj, patterns); }
+
+// ---------- alarm definitions ----------
+// DUP_COUNTS se precalcula una sola vez sobre TODOS los registros (no sobre los
+// filtrados): así la alarma de duplicados es O(n) en vez de O(n^2) y sigue siendo
+// correcta aunque el usuario esté viendo un subconjunto filtrado.
+let DUP_COUNTS = new Map();
+function buildDupCounts(allResults){
+  const m = new Map();
+  allResults.forEach(r=>{ const k = trim(F_entrevistaId(r)); if(!k) return; m.set(k, (m.get(k)||0)+1); });
+  DUP_COUNTS = m;
+}
+
+const ALARM_DEFS = [
+  {key:'gps', label:'GPS faltante o en (0,0)', level:'warning', test:(r)=>{ const g=F_geo(r); return isNaN(g.lat)||isNaN(g.lon)||(g.lat===0&&g.lon===0); }},
+  {key:'incompleta', label:'Entrevista no completa', level:'critical', test:(r)=>{ const v=trim(F_resultado(r)); return v!=='' && !/completo/i.test(v); }},
+  {key:'sin_resultado', label:'Sin resultado de visita', level:'warning', test:(r)=> trim(F_resultado(r))===''},
+  {key:'sin_consentimiento', label:'Sin consentimiento', level:'critical', test:(r)=>{ const v=trim(F_consentimiento(r)); return v!=='' && !isSi(v); }},
+  {key:'contradiccion_consentimiento', label:'Contradicción: completa pero sin consentimiento claro', level:'critical', test:(r)=> /completo/i.test(trim(F_resultado(r))) && !isSi(F_consentimiento(r))},
+  {key:'sin_encuestador', label:'Encuestador vacío', level:'warning', test:(r)=> !trim(F_encuestador(r))},
+  {key:'sin_fecha', label:'Fecha de visita vacía', level:'warning', test:(r)=> !trim(F_fecha(r))},
+  {key:'edad_discrepante', label:'Edad discrepante (>5 años entre padrón y final)', level:'warning', test:(r)=>{ const a=num(F_edadPadron(r)),b=num(F_edadFinal(r)); return !isNaN(a)&&!isNaN(b)&&Math.abs(a-b)>5; }},
+  {key:'duracion_corta', label:'Duración muy corta (<3 min)', level:'warning', test:(r)=>{ const d=durationMin(r); return d!==null && d<3; }},
+  {key:'duracion_larga', label:'Duración muy larga (>4 h) — posible pausa sin cerrar', level:'warning', test:(r)=>{ const d=durationMin(r); return d!==null && d>240; }},
+  {key:'no_forma_parte_plan', label:'No forma parte del plan de negocios de la OPR', level:'warning', test:(r)=> isNo(F_formaParteOPR(r))},
+  {key:'sin_formacion', label:'Sin asistencia técnica/capacitación registrada', level:'warning', test:(r)=>{ const v=F_asistenciaTecnica(r); return v===0||v==='0'||v===undefined||v===''; }},
+  {key:'gps_fuera_rango', label:'Coordenadas GPS fuera del rango esperado', level:'critical', test:(r)=>{ const g=F_geo(r); if(isNaN(g.lat)||isNaN(g.lon)||(g.lat===0&&g.lon===0)) return false; return g.lat<10 || g.lat>19 || g.lon<-92 || g.lon>-81; }},
+  {key:'duplicado', label:'Entrevista con ID duplicado', level:'critical', test:(r)=>{ const k=trim(F_entrevistaId(r)); return !!k && (DUP_COUNTS.get(k)||0) > 1; }},
+];
+function computeAlarmsForRow(row, allRows){ const hits=[]; ALARM_DEFS.forEach(def=>{ try{ if(def.test(row, allRows)) hits.push(def); }catch(e){} }); return hits; }
+
+// ---------- state ----------
+let ALL_RESULTS = null;   // todo lo que vino de Kobo
+let CURRENT_ROWS = null;  // lo que se está mostrando (después de filtros)
+let GROUPS = null;        // {classified, allKeys}
+let mapInstance = null;
+let lastMarkersGroup = null;
+
+const PREFS_KEY = 'comrural_prefs_v1';
+function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(PREFS_KEY)||'{}') || {}; }catch(e){ return {}; } }
+function savePrefs(p){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }catch(e){} }
+
+// ---------- error boundary por pestaña ----------
+function safe(panelKey, label, fn){
+  const box = document.getElementById('err-'+panelKey);
+  if(box) box.innerHTML = '';
+  try{ fn(); }
+  catch(err){
+    console.error('['+panelKey+']', err);
+    if(box){
+      box.innerHTML = `<div class="render-error"><b>No se pudo construir ${esc(label)}.</b><br>${esc(err.message)}<br>
+        Las demás pestañas siguen funcionando. Revisa la pestaña "Diagnóstico" y mándame lo que muestra para corregir el mapeo de campos.</div>`;
+    }
+  }
+}
+
+// ---------- filtros ----------
+function fillSelect(el, values, allLabel){
+  const prev = el.value;
+  el.innerHTML = `<option value="">${allLabel}</option>` + values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  if(prev && values.includes(prev)) el.value = prev;
+}
+function buildFilterOptions(rows){
+  fillSelect(document.getElementById('fCadena'), [...new Set(rows.map(r=>trim(F_cadena(r))).filter(Boolean))].sort(), 'Todas las cadenas');
+  fillSelect(document.getElementById('fVentana'), [...new Set(rows.map(r=>trim(F_ventana(r))).filter(Boolean))].sort(), 'Todas las ventanas');
+  fillSelect(document.getElementById('fEncuestador'), [...new Set(rows.map(r=>trim(F_encuestador(r))).filter(Boolean))].sort(), 'Todos los encuestadores');
+}
+function getFilteredRows(){
+  const desde = document.getElementById('fDesde').value;
+  const hasta = document.getElementById('fHasta').value;
+  const cad = document.getElementById('fCadena').value;
+  const ven = document.getElementById('fVentana').value;
+  const enc = document.getElementById('fEncuestador').value;
+  return (ALL_RESULTS||[]).filter(r=>{
+    const f = toDateLabel(F_fecha(r));
+    if(desde && (!f || f < desde)) return false;
+    if(hasta && (!f || f > hasta)) return false;
+    if(cad && trim(F_cadena(r)) !== cad) return false;
+    if(ven && trim(F_ventana(r)) !== ven) return false;
+    if(enc && trim(F_encuestador(r)) !== enc) return false;
+    return true;
+  });
+}
+function applyFilters(){
+  const rows = getFilteredRows();
+  const note = document.getElementById('filterNote');
+  const activo = ['fDesde','fHasta','fCadena','fVentana','fEncuestador'].some(id=>document.getElementById(id).value);
+  note.innerHTML = activo
+    ? `Mostrando <b>${rows.length}</b> de ${ALL_RESULTS.length} entrevistas (filtro activo).`
+    : `Mostrando las ${ALL_RESULTS.length} entrevistas registradas.`;
+  renderAll(rows);
+}
+['fDesde','fHasta','fCadena','fVentana','fEncuestador'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('clearFilters').addEventListener('click', ()=>{
+  ['fDesde','fHasta','fCadena','fVentana','fEncuestador'].forEach(id=>{ document.getElementById(id).value=''; });
+  applyFilters();
+});
+
+// ---------- KPIs / avance ----------
+function renderAvance(rows){
+  const total = rows.length;
+  const completas = rows.filter(r=>/completo/i.test(trim(F_resultado(r)))).length;
+  const cadenas = new Set(rows.map(r=>trim(F_cadena(r))).filter(Boolean));
+  const encuestadores = new Set(rows.map(r=>trim(F_encuestador(r))).filter(Boolean));
+  const ventanas = new Set(rows.map(r=>trim(F_ventana(r))).filter(Boolean));
+
+  const conAlarma = rows.filter(r=>computeAlarmsForRow(r, rows).length>0).length;
+
+  const kpis = [
+    {label:'Entrevistas registradas', value: total},
+    {label:'Completas', value: completas},
+    {label:'% completas', value: (pct(completas,total)===null?'—':pct(completas,total)+'%')},
+    {label:'Con alguna alarma', value: conAlarma},
+    {label:'Cadenas de valor activas', value: cadenas.size},
+    {label:'Encuestadores activos', value: encuestadores.size},
+    {label:'Ventanas activas', value: ventanas.size},
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k=>`<div class="kpi"><div class="value">${k.value}</div><div class="label">${k.label}</div></div>`).join('');
+
+  const byDate = groupCount(rows, r=>toDateLabel(F_fecha(r)));
+  const dateLabels = [...byDate.keys()].sort();
+  lineChart(document.getElementById('chartDia'), {labels:dateLabels, values:dateLabels.map(d=>byDate.get(d)), color:seriesColor(0)});
+
+  const byEnc = sortedEntries(groupCount(rows, r=>trim(F_encuestador(r))));
+  barChart(document.getElementById('chartEncuestador'), {labels:byEnc.map(e=>e[0]), values:byEnc.map(e=>e[1]), horizontal:true, color:seriesColor(1), height:Math.max(160, byEnc.length*28+20)});
+
+  const byCadena = sortedEntries(groupCount(rows, r=>trim(F_cadena(r))));
+  barChart(document.getElementById('chartCadena'), {labels:byCadena.map(e=>e[0]), values:byCadena.map(e=>e[1]), color:seriesColor(2)});
+
+  const byVentana = sortedEntries(groupCount(rows, r=>trim(F_ventana(r))));
+  barChart(document.getElementById('chartVentana'), {labels:byVentana.map(e=>e[0]), values:byVentana.map(e=>e[1]), color:seriesColor(3)});
+
+  const byVersion = sortedEntries(groupCount(rows, r=>trim(F_version(r))));
+  barChart(document.getElementById('chartVersion'), {labels:byVersion.map(e=>e[0].slice(0,10)), values:byVersion.map(e=>e[1]), color:seriesColor(4)});
+
+  renderCobertura(rows);
+}
+
+function renderCobertura(rows){
+  // Cadenas y ventanas del universo completo, para que las filas/columnas no
+  // desaparezcan al aplicar un filtro (se ven en cero).
+  const cadenaList = [...new Set((ALL_RESULTS||rows).map(r=>trim(F_cadena(r))).filter(Boolean))].sort();
+  const ventanaList = [...new Set((ALL_RESULTS||rows).map(r=>trim(F_ventana(r))).filter(Boolean))].sort();
+
+  const matrix = {};
+  cadenaList.forEach(c=>{ matrix[c] = {}; ventanaList.forEach(v=>matrix[c][v]=0); matrix[c].__total = 0; });
+  rows.forEach(r=>{
+    const c = trim(F_cadena(r)), v = trim(F_ventana(r));
+    if(!matrix[c]) return;
+    if(v && matrix[c][v]!==undefined) matrix[c][v]++;
+    matrix[c].__total++;
+  });
+
+  const exportRows = [['Cadena', ...ventanaList, 'Total', '% del total']];
+  let html = '<thead><tr><th>Cadena</th>'
+    + ventanaList.map(v=>`<th class="num">${esc(v)}</th>`).join('')
+    + '<th class="num">Total</th><th class="num">% del total</th></tr></thead><tbody>';
+
+  let grand = 0;
+  const ventanaTotals = {}; ventanaList.forEach(v=>ventanaTotals[v]=0);
+  cadenaList.forEach(cad=>{ grand += matrix[cad].__total; });
+
+  cadenaList.forEach(cad=>{
+    const tot = matrix[cad].__total;
+    const share = pct(tot, grand);
+    html += `<tr><td>${esc(cad)}</td>`;
+    ventanaList.forEach(v=>{ const n = matrix[cad][v]; ventanaTotals[v]+=n; html += `<td class="num">${n||''}</td>`; });
+    html += `<td class="num"><b>${tot}</b></td><td class="num">${share===null?'—':share+'%'}</td></tr>`;
+    exportRows.push([cad, ...ventanaList.map(v=>matrix[cad][v]), tot, share===null?'':share+'%']);
+  });
+
+  html += `<tr><td><b>Total</b></td>`
+    + ventanaList.map(v=>`<td class="num"><b>${ventanaTotals[v]}</b></td>`).join('')
+    + `<td class="num"><b>${grand}</b></td><td class="num">${grand?'100%':'—'}</td></tr>`;
+  html += '</tbody>';
+  exportRows.push(['Total', ...ventanaList.map(v=>ventanaTotals[v]), grand, grand?'100%':'']);
+
+  document.getElementById('tablaCobertura').innerHTML = html;
+  EXPORTS.cobertura = exportRows;
+}
+
+// ---------- cadena indicators ----------
+function miembrosOf(row){ return GROUPS.classified.miembros ? (row[GROUPS.classified.miembros]||[]) : []; }
+function practicasOf(row){ return GROUPS.classified.practicas ? (row[GROUPS.classified.practicas]||[]) : []; }
+function sostenibilidadOf(row){ return GROUPS.classified.sostenibilidad ? (row[GROUPS.classified.sostenibilidad]||[]) : []; }
+
+function practicaAdoptadaAntes(p){ const v = pick(p, [/301/, /antes.*aplicaba/i]); return isSi(v); }
+function practicaAdoptadaAntesRaw(p){ return pick(p, [/301/, /antes.*aplicaba/i]); }
+function practicaNombre(p){ return pick(p, [/^300\./, /practica.*tecnologia/i, 'a_productor']); }
+
+function sostCampo(s, patterns){ return pick(s, patterns); }
+
+const SOST_FIELDS = [
+  {label:'Interesado en continuar', patterns:[/401/, /interesad.*seguir/i]},
+  {label:'Mano de obra suficiente', patterns:[/404/, /mano de obra/i]},
+  {label:'Otros productores la usan', patterns:[/406/, /conoce.*otros productores/i]},
+  {label:'Insumos disponibles localmente', patterns:[/408/, /insumos/i]},
+  {label:'Cuenta con equipo/herramientas', patterns:[/409/, /equipo.*herramientas/i]},
+  {label:'Dejó de aplicar por falta de recursos', patterns:[/410/, /falta de recursos/i]},
+];
+
+const CADENA_INDICATORS = [
+  {label:'N entrevistas', fn:(rows)=> rows.length},
+  {label:'N completas', fn:(rows)=> rows.filter(r=>/completo/i.test(trim(F_resultado(r)))).length},
+  {label:'% completas', fn:(rows)=> pct(rows.filter(r=>/completo/i.test(trim(F_resultado(r)))).length, rows.length), suf:'%'},
+  {label:'Encuestadores distintos', fn:(rows)=> new Set(rows.map(r=>trim(F_encuestador(r))).filter(Boolean)).size},
+  {label:'Ventanas distintas', fn:(rows)=> new Set(rows.map(r=>trim(F_ventana(r))).filter(Boolean)).size},
+  {label:'Edad promedio del productor', fn:(rows)=> fmt(avg(rows.map(r=>num(F_edadFinal(r)))))},
+  {label:'% productoras (sexo femenino)', fn:(rows)=>{ const v=rows.map(r=>trim(F_sexoEtiqueta(r))).filter(Boolean); return pct(v.filter(s=>/femenino/i.test(s)).length, v.length); }, suf:'%'},
+  {label:'Miembros del hogar (promedio, declarado)', fn:(rows)=> fmt(avg(rows.map(r=>num(F_hogarPersonas(r)))))},
+  {label:'Miembros del hogar (promedio, del módulo)', fn:(rows)=> fmt(avg(rows.map(r=>miembrosOf(r).length).filter(n=>n>0)))},
+  {label:'% forma parte del plan de negocios OPR', fn:(rows)=>{ const v=rows.map(r=>trim(F_formaParteOPR(r))).filter(Boolean); return pct(v.filter(isSi).length, v.length); }, suf:'%'},
+  {label:'% con asistencia técnica/capacitación', fn:(rows)=>{ const v=rows.filter(r=>{ const a=F_asistenciaTecnica(r); return a===1||a==='1'||isSi(a); }); return pct(v.length, rows.length); }, suf:'%'},
+  {label:'Prácticas evaluadas por entrevista (promedio)', fn:(rows)=> fmt(avg(rows.map(r=>practicasOf(r).length)))},
+  {label:'% de prácticas del catálogo ya aplicadas antes', fn:(rows)=>{
+    let si=0,total=0;
+    rows.forEach(r=> practicasOf(r).forEach(p=>{ const v=practicaAdoptadaAntesRaw(p); if(trim(v)!==''){ total++; if(isSi(v)) si++; } }));
+    return pct(si,total);
+  }, suf:'%'},
+  {label:'Prácticas actuales por entrevista (promedio)', fn:(rows)=> fmt(avg(rows.map(r=>num(F_nActuales(r)))))},
+];
+SOST_FIELDS.forEach(sf=>{
+  CADENA_INDICATORS.push({label:'% '+sf.label.toLowerCase(), fn:(rows)=>{
+    let si=0,total=0;
+    rows.forEach(r=> sostenibilidadOf(r).forEach(s=>{ const v=sostCampo(s, sf.patterns); if(trim(v)!==''){ total++; if(isSi(v)) si++; } }));
+    return pct(si,total);
+  }, suf:'%'});
+});
+CADENA_INDICATORS.push(
+  {label:'% con GPS registrado', fn:(rows)=>{ const ok=rows.filter(r=>{ const g=F_geo(r); return !isNaN(g.lat)&&!isNaN(g.lon)&&!(g.lat===0&&g.lon===0); }); return pct(ok.length, rows.length); }, suf:'%'},
+  {label:'% de entrevistas con alguna alarma de calidad', fn:(rows)=>{ const flagged=rows.filter(r=>computeAlarmsForRow(r,rows).length>0); return pct(flagged.length, rows.length); }, suf:'%'}
+);
+
+function renderCadena(rows){
+  const cadenas = [...new Set(rows.map(r=>trim(F_cadena(r))).filter(Boolean))].sort();
+  document.getElementById('cadenaSub').textContent = `${CADENA_INDICATORS.length} indicadores × ${cadenas.length} cadenas de valor`;
+
+  // Un solo subconjunto por cadena, reutilizado por todos los indicadores.
+  const subsets = {}; cadenas.forEach(c=>subsets[c]=[]);
+  rows.forEach(r=>{ const c=trim(F_cadena(r)); if(subsets[c]) subsets[c].push(r); });
+
+  const exportRows = [['Indicador', ...cadenas, 'Total']];
+  let html = '<thead><tr><th>Indicador</th>'+cadenas.map(c=>`<th class="num">${esc(c)}</th>`).join('')+'<th class="num">Total</th></tr></thead><tbody>';
+  CADENA_INDICATORS.forEach(ind=>{
+    const cells = cadenas.map(cad=>{
+      let v; try{ v = ind.fn(subsets[cad]); }catch(e){ v = null; }
+      return (v===null||v===undefined||Number.isNaN(v)) ? '—' : v + (ind.suf||'');
+    });
+    let t; try{ t = ind.fn(rows); }catch(e){ t = null; }
+    const totalCell = (t===null||t===undefined||Number.isNaN(t)) ? '—' : t + (ind.suf||'');
+    html += `<tr><td>${esc(ind.label)}</td>`
+      + cells.map(c=>`<td class="num">${esc(c)}</td>`).join('')
+      + `<td class="num"><b>${esc(totalCell)}</b></td></tr>`;
+    exportRows.push([ind.label, ...cells, totalCell]);
+  });
+  html += '</tbody>';
+  document.getElementById('tablaCadena').innerHTML = html;
+  EXPORTS.cadena = exportRows;
+  renderMap(rows, cadenas);
+}
+
+function renderMap(rows, cadenas){
+  const el = document.getElementById('map');
+  if(!mapInstance){ mapInstance = L.map(el); } else { mapInstance.eachLayer(l=>mapInstance.removeLayer(l)); }
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap'}).addTo(mapInstance);
+  const cadenaColor = {}; cadenas.forEach((c,i)=>cadenaColor[c]=seriesColor(i));
+  const markers = [];
+  rows.forEach(r=>{
+    const g = F_geo(r);
+    if(isNaN(g.lat)||isNaN(g.lon)||(g.lat===0&&g.lon===0)) return;
+    const cad = trim(F_cadena(r));
+    const marker = L.circleMarker([g.lat,g.lon], {radius:6, fillColor:cadenaColor[cad]||seriesColor(0), fillOpacity:0.85, color:'#fff', weight:1})
+      .bindPopup(`<b>${esc(trim(F_entrevistaId(r)))}</b><br>${esc(trim(F_nombreFinal(r))||trim(F_productor(r)))}<br>${esc(cad)}<br>Encuestador: ${esc(trim(F_encuestador(r)))}<br>Fecha: ${esc(toDateLabel(F_fecha(r)))}`);
+    marker.addTo(mapInstance); markers.push(marker);
+  });
+  if(markers.length){ lastMarkersGroup = L.featureGroup(markers); mapInstance.fitBounds(lastMarkersGroup.getBounds().pad(0.2)); }
+  else { lastMarkersGroup = null; mapInstance.setView([14.6,-86.5], 6); }
+  document.getElementById('mapLegend').innerHTML = cadenas.map(c=>`<span class="legend-item"><span class="legend-dot" style="background:${cadenaColor[c]}"></span>${esc(c)}</span>`).join('');
+  setTimeout(()=>mapInstance.invalidateSize(), 100);
+}
+
+// ---------- alarmas ----------
+function renderAlarmas(rows){
+  const perRow = rows.map(r=>({row:r, alarms: computeAlarmsForRow(r, rows)}));
+  const flagged = perRow.filter(x=>x.alarms.length>0);
+  const critCount = perRow.filter(x=>x.alarms.some(a=>a.level==='critical')).length;
+
+  document.getElementById('alarmKpiGrid').innerHTML = [
+    {label:'Entrevistas con alguna alarma', value: flagged.length},
+    {label:'Con alarma crítica', value: critCount, critical: critCount>0},
+    {label:'Total de alarmas detectadas', value: perRow.reduce((s,x)=>s+x.alarms.length,0)},
+    {label:'Tipos de alarma activos', value: ALARM_DEFS.length},
+  ].map(k=>`<div class="kpi"><div class="value ${k.critical?'critical':''}">${k.value}</div><div class="label">${k.label}</div></div>`).join('');
+
+  const catalogExport = [['Nivel','Alarma','Entrevistas afectadas','% del total mostrado']];
+  document.getElementById('alarmCatalog').innerHTML = ALARM_DEFS.map(def=>{
+    const n = perRow.filter(x=>x.alarms.includes(def)).length;
+    catalogExport.push([def.level==='critical'?'crítica':'alerta', def.label, n, rows.length? Math.round(n/rows.length*100)+'%' : '']);
+    return `<div class="catalog-item"><span class="badge ${def.level}">${def.level==='critical'?'crítica':'alerta'}</span> ${esc(def.label)} — <span class="cnt">${n}</span> entrevista(s)</div>`;
+  }).join('');
+  EXPORTS.catalogo = catalogExport;
+
+  const top = [...perRow].sort((a,b)=>b.alarms.length-a.alarms.length).filter(x=>x.alarms.length>0).slice(0,12);
+  barChart(document.getElementById('chartAlarmasTop'), {labels: top.map(x=>trim(F_entrevistaId(x.row)).slice(0,8)), values: top.map(x=>x.alarms.length), horizontal:true, color:seriesColor(7), height:Math.max(160, top.length*28+20)});
+
+  const tbody = document.querySelector('#qualityTable tbody');
+  const detailExport = [['Entrevista','Productor','Cadena','Ventana','Encuestador','Fecha','N alarmas','Alarmas']];
+  if(!flagged.length){ tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin alertas — datos limpios</td></tr>'; }
+  else {
+    tbody.innerHTML = flagged.map(x=>{
+      const r = x.row;
+      detailExport.push([
+        trim(F_entrevistaId(r)), trim(F_nombreFinal(r))||trim(F_productor(r)), trim(F_cadena(r)),
+        trim(F_ventana(r)), trim(F_encuestador(r)), toDateLabel(F_fecha(r)),
+        x.alarms.length, x.alarms.map(a=>a.label).join(' | ')
+      ]);
+      return `<tr><td>${esc(trim(F_entrevistaId(r)))}</td><td>${esc(trim(F_nombreFinal(r))||trim(F_productor(r)))}</td><td>${esc(trim(F_cadena(r)))}</td><td>${esc(trim(F_encuestador(r)))}</td><td>${esc(toDateLabel(F_fecha(r)))}</td><td>${x.alarms.map(a=>`<span class="badge ${a.level}">${esc(a.label)}</span>`).join('')}</td></tr>`;
+    }).join('');
+  }
+  EXPORTS.alarmas = detailExport;
+}
+
+// ---------- ficha ----------
+function renderFichaSelector(rows){
+  const select = document.getElementById('fichaSelect');
+  const prevId = select.value !== '' && select.options.length ? select.options[select.selectedIndex]?.dataset.eid : null;
+  select.innerHTML = rows.map((r,i)=>`<option value="${i}" data-eid="${esc(trim(F_entrevistaId(r)))}">${esc(trim(F_entrevistaId(r)).slice(0,8))} — ${esc(trim(F_nombreFinal(r))||trim(F_productor(r)))} (${esc(trim(F_cadena(r)))})</option>`).join('');
+  if(!rows.length){ document.getElementById('fichaTable').innerHTML=''; document.getElementById('fichaAlarmas').innerHTML='<div class="empty">Ninguna entrevista coincide con el filtro.</div>'; EXPORTS.ficha=null; return; }
+  // conservar la entrevista seleccionada si sigue estando en el subconjunto filtrado
+  let idx = 0;
+  if(prevId){ const found = rows.findIndex(r=>trim(F_entrevistaId(r))===prevId); if(found>=0) idx = found; }
+  select.value = String(idx);
+  select.onchange = ()=> renderFicha(rows[+select.value], rows);
+  renderFicha(rows[idx], rows);
+}
+
+function renderFicha(row, allRows){
+  const alarms = computeAlarmsForRow(row, allRows);
+  document.getElementById('fichaAlarmas').innerHTML = alarms.length
+    ? `<p><b>Alarmas:</b> ${alarms.map(a=>`<span class="badge ${a.level}">${esc(a.label)}</span>`).join('')}</p>`
+    : `<p><span class="badge good">Sin alarmas detectadas</span></p>`;
+
+  const miembros = miembrosOf(row);
+  const practicas = practicasOf(row);
+  const sostenibilidad = sostenibilidadOf(row);
+  const practicasActuales = sostenibilidad.map(s=> pick(s,[/^400\./, /practica.*tecnologia/i])).filter(Boolean);
+  const practicasNoAdoptadas = practicas.filter(p=>!practicaAdoptadaAntes(p) && trim(practicaAdoptadaAntesRaw(p))!=='').map(practicaNombre).filter(Boolean);
+
+  const sexoKey = pickKey((miembros[0]||{}), [/sexo/i]);
+  const edadKey = pickKey((miembros[0]||{}), [/edad/i]);
+  const sexos = miembros.map(m=> sexoKey? trim(m[sexoKey]) : '').filter(Boolean);
+  const edadesHogar = miembros.map(m=> edadKey? num(m[edadKey]) : NaN).filter(n=>!isNaN(n));
+
+  const g = F_geo(row);
+
+  const rowsFicha = [
+    ['—— Identificación ——',''],
+    ['Entrevista ID', trim(F_entrevistaId(row))],
+    ['Código y nombre del productor', trim(F_productor(row))],
+    ['Cadena de valor', trim(F_cadena(row))],
+    ['Ventana', trim(F_ventana(row))],
+    ['Municipio', trim(F_municipio(row))],
+    ['Supervisor', trim(F_supervisor(row))],
+    ['Encuestador', trim(F_encuestador(row))],
+    ['Fecha de visita', toDateLabel(F_fecha(row))],
+    ['Resultado de la visita', trim(F_resultado(row))],
+    ['Consentimiento', trim(F_consentimiento(row))],
+    ['Versión del formulario', trim(F_version(row))],
+    ['Duración de la entrevista (min)', (()=>{ const d=durationMin(row); return d===null? '—' : fmt(d); })()],
+    ['Coordenadas GPS', (!isNaN(g.lat)&&!isNaN(g.lon)) ? `${g.lat}, ${g.lon}` : '—'],
+    ['—— Datos del productor ——',''],
+    ['Nombre final', trim(F_nombreFinal(row))],
+    ['Edad (padrón → final)', `${trim(F_edadPadron(row))||'—'} → ${trim(F_edadFinal(row))||'—'}`],
+    ['Sexo', trim(F_sexoEtiqueta(row))],
+    ['—— Hogar ——',''],
+    ['Personas en el hogar (declarado)', trim(F_hogarPersonas(row))||'—'],
+    ['Miembros registrados en módulo hogar', miembros.length],
+    ['Sexo de miembros del hogar', sexos.length? `${sexos.filter(s=>/mascul/i.test(s)).length}H / ${sexos.filter(s=>/femen/i.test(s)).length}M` : '—'],
+    ['Edad promedio de miembros del hogar', fmt(avg(edadesHogar))],
+    ['¿Algún miembro migró?', trim(F_migro(row))||'—'],
+    ['Forma parte del plan de negocios OPR', trim(F_formaParteOPR(row))||'—'],
+    ['Asistencia técnica/capacitación', (()=>{ const a=F_asistenciaTecnica(row); return (a===1||a==='1'||isSi(a))?'Sí':'No registrada'; })()],
+    ['—— Prácticas y tecnologías ——',''],
+    ['Prácticas evaluadas (catálogo)', practicas.length],
+    ['Prácticas actuales (n_actuales)', trim(F_nActuales(row))||'—'],
+    ['Prácticas que usa actualmente', practicasActuales.length? practicasActuales.map(p=>String(p).split('(')[0].trim()).join('; ') : '—'],
+    ['Prácticas que NO adoptó (antes)', practicasNoAdoptadas.length? practicasNoAdoptadas.slice(0,8).map(p=>String(p).split('(')[0].trim()).join('; ') : '—'],
+    ['—— Sostenibilidad (prácticas actuales) ——',''],
+  ];
+  SOST_FIELDS.forEach(sf=>{
+    const vals = sostenibilidad.map(s=>trim(sostCampo(s, sf.patterns))).filter(Boolean);
+    const si = vals.filter(isSi).length;
+    rowsFicha.push([sf.label, vals.length? `${si}/${vals.length} prácticas` : '—']);
+  });
+
+  document.getElementById('fichaTable').innerHTML = rowsFicha.map(([k,v])=>{
+    if(v===''){ return `<tr><td colspan="2" class="ficha-section">${esc(k.replace(/——/g,'').trim())}</td></tr>`; }
+    return `<tr><td>${esc(k)}</td><td>${esc((v===undefined||v===null||v==='')?'—':v)}</td></tr>`;
+  }).join('');
+
+  // ficha exportable como CSV (dos columnas), con las alarmas al inicio
+  const fichaExport = [['Campo','Valor'], ['Alarmas detectadas', alarms.length? alarms.map(a=>a.label).join(' | ') : 'Ninguna']];
+  rowsFicha.forEach(([k,v])=>{
+    if(v===''){ fichaExport.push(['', '']); fichaExport.push([k.replace(/——/g,'').trim(), '']); }
+    else fichaExport.push([k, (v===undefined||v===null||v==='')?'—':v]);
+  });
+  EXPORTS.ficha = fichaExport;
+}
+document.getElementById('printFicha').addEventListener('click', ()=> window.print());
+
+// ---------- diagnóstico ----------
+function renderDiagnostico(results){
+  const first = results[0] || {};
+  const topKeys = Object.keys(first);
+  let html = `<div class="stat-row" style="margin-bottom:14px;">
+    <div class="stat-pill"><div class="v">${(ALL_RESULTS||results).length}</div><div class="l">Registros recibidos de Kobo</div></div>
+    <div class="stat-pill"><div class="v">${topKeys.length}</div><div class="l">Campos en el registro principal</div></div>
+    <div class="stat-pill"><div class="v">${GROUPS.allKeys.length}</div><div class="l">Grupos repetibles detectados</div></div>
+  </div>`;
+
+  html += `<h3>Grupos repetibles</h3>`;
+  ['miembros','practicas','sostenibilidad'].forEach(kind=>{
+    const key = GROUPS.classified[kind];
+    if(key){
+      html += `<p><span class="badge good">detectado</span> <b>${kind}</b> → campo <code>${esc(key)}</code></p>`;
+    } else {
+      html += `<p><span class="badge warning">no detectado</span> <b>${kind}</b> — revisa "otros grupos encontrados" abajo, o mándame un registro de ejemplo para ajustarlo.</p>`;
+    }
+  });
+  if(GROUPS.classified.otros.length){
+    html += `<p>Otros grupos encontrados sin clasificar: ${GROUPS.classified.otros.map(k=>`<code>${esc(k)}</code>`).join(', ')}</p>`;
+  }
+
+  // Chequeo de los campos clave: qué getter encontró algo y qué no.
+  const CHECKS = [
+    ['Entrevista ID', F_entrevistaId], ['Ventana', F_ventana], ['Productor', F_productor],
+    ['Cadena de valor', F_cadena], ['Fecha de visita', F_fecha], ['Resultado', F_resultado],
+    ['Supervisor', F_supervisor], ['Encuestador', F_encuestador], ['Consentimiento', F_consentimiento],
+    ['Nombre final', F_nombreFinal], ['Edad padrón', F_edadPadron], ['Edad final', F_edadFinal],
+    ['Sexo', F_sexoEtiqueta], ['Municipio', F_municipio], ['Personas en el hogar', F_hogarPersonas],
+    ['Plan de negocios OPR', F_formaParteOPR], ['Migración', F_migro],
+    ['Asistencia técnica', F_asistenciaTecnica], ['Prácticas actuales (n)', F_nActuales],
+    ['Versión del formulario', F_version],
+  ];
+  html += `<h3>Campos clave encontrados</h3><table><thead><tr><th>Dato</th><th>Estado</th><th>Ejemplo del primer registro con valor</th></tr></thead><tbody>`;
+  CHECKS.forEach(([label, fn])=>{
+    let sample, found=false;
+    for(const r of results){ let v; try{ v = fn(r); }catch(e){ v = undefined; } if(v!==undefined && trim(v)!==''){ sample=v; found=true; break; } }
+    html += `<tr><td>${esc(label)}</td><td>${found?'<span class="badge good">ok</span>':'<span class="badge warning">vacío</span>'}</td><td>${esc(found? String(sample).slice(0,70) : '—')}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+
+  html += `<h3>Campos del registro principal (primer registro)</h3><pre>${esc(topKeys.join('\n'))}</pre>`;
+  html += `<h3>Registro de ejemplo (primero, completo)</h3><pre>${esc(JSON.stringify(first, null, 2).slice(0,4000))}</pre>`;
+  document.getElementById('diagContent').innerHTML = html;
+}
+
+// ---------- orquestador ----------
+function renderAll(rows){
+  CURRENT_ROWS = rows;
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+
+  safe('avance',      'la pestaña de avance de campo',   ()=> renderAvance(rows));
+  safe('cadena',      'la tabla de indicadores por cadena', ()=> renderCadena(rows));
+  safe('alarmas',     'la pestaña de calidad y alarmas', ()=> renderAlarmas(rows));
+  safe('ficha',       'el visualizador individual',      ()=> renderFichaSelector(rows));
+  safe('diagnostico', 'el diagnóstico',                  ()=> renderDiagnostico(rows.length? rows : (ALL_RESULTS||[])));
+}
+
+function ingest(results){
+  ALL_RESULTS = results;
+  GROUPS = detectRepeatGroups(results);
+  buildDupCounts(results);
+  buildFilterOptions(results);
+  applyFilters();
+}
+
+// ---------- carga desde Kobo ----------
+let loading = false;
+async function loadFromKobo(){
+  if(loading) return;
+  loading = true;
+  const statusLine = document.getElementById('statusLine');
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true;
+  statusLine.className = 'status-line';
+  statusLine.textContent = 'Pidiendo los datos a Kobo (vía el servidor)…';
+  try{
+    const resp = await fetch(PROXY_URL + (PROXY_URL.includes('?') ? '&' : '?') + 't=' + Date.now());
+
+    if(resp.status === 404){
+      throw new Error(`No se encontró "${PROXY_URL}". Sube kobo_proxy.php a la misma carpeta que este archivo en tu hosting.`);
+    }
+
+    const texto = await resp.text();
+    let data;
+    try{
+      data = JSON.parse(texto);
+    }catch(e){
+      const limpio = texto.trim();
+      if(/^<!doctype|^<html/i.test(limpio)){
+        // El servidor devolvió una página web completa: casi siempre significa que
+        // kobo_proxy.php no está en esa ruta y el hosting sirvió otra página.
+        throw new Error(`El servidor devolvió una página HTML en vez de datos. Revisa que "${PROXY_URL}" exista en la misma carpeta que este archivo y que tu hosting tenga PHP activo.`);
+      }
+      // Un error de PHP suele venir como texto suelto y dice exactamente qué pasó.
+      throw new Error('El servidor no devolvió datos válidos. Respondió: ' + limpio.slice(0,240).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim());
+    }
+
+    if(data && data.error){ throw new Error(data.error); }
+    if(!Array.isArray(data.results)){ throw new Error('La respuesta no tiene el formato esperado (sin "results").'); }
+
+    if(!data.results.length){
+      statusLine.textContent = 'Kobo respondió correctamente, pero no hay registros todavía.';
+      return;
+    }
+    ingest(data.results);
+    statusLine.textContent = `Actualizado: ${new Date().toLocaleString('es-HN')} · ${data.results.length} entrevistas cargadas desde Kobo`;
+  } catch(err){
+    statusLine.className = 'status-line err';
+    statusLine.textContent = 'Error al cargar los datos: ' + err.message;
+    console.error(err);
+  } finally {
+    loading = false;
+    document.getElementById('loadBtn').disabled = false;
+  }
+}
+
+document.getElementById('loadBtn').addEventListener('click', loadFromKobo);
+
+// ---------- actualización automática ----------
+let autoTimer = null;
+function setupAutoRefresh(){
+  const sel = document.getElementById('autoRefresh');
+  if(autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+  const minutes = parseInt(sel.value, 10);
+  const prefs = loadPrefs(); prefs.autoRefresh = sel.value; savePrefs(prefs);
+  if(minutes > 0){ autoTimer = setInterval(loadFromKobo, minutes*60*1000); }
+}
+document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+
+// ---------- redibujar gráficos al cambiar el tamaño de la ventana ----------
+let resizeTimer = null;
+window.addEventListener('resize', ()=>{
+  if(!CURRENT_ROWS) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{
+    safe('avance','la pestaña de avance de campo', ()=> renderAvance(CURRENT_ROWS));
+    safe('alarmas','la pestaña de calidad y alarmas', ()=> renderAlarmas(CURRENT_ROWS));
+    if(mapInstance) mapInstance.invalidateSize();
+  }, 220);
+});
+
+// ---------- arranque ----------
+(function init(){
+  const prefs = loadPrefs();
+  const sel = document.getElementById('autoRefresh');
+  sel.value = (prefs.autoRefresh !== undefined) ? prefs.autoRefresh : '10';
+  setupAutoRefresh();
+  loadFromKobo();
+})();
+</script>
+</body>
+</html>
